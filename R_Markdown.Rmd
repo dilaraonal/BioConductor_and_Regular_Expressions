@@ -1,0 +1,246 @@
+---
+title: "BSB632 HW3"
+author: "Dilara ONAL"
+date: "2024-05-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+``` 
+# BSB632
+## Homework III
+In the article by Okuda, T (2019), transcriptomic data from the livers and brains of regularly fed (chow diet) mice and LCKD-fed mice are available on the GEO website with the ID GSE115342. In this study, analyzes are performed on this data. The data contains information of four categories (chow-diet cortex, chow-diet liver, LCKD cortex and LCKD liver). 
+
+
+**A- ** The necessary packages to download the dataset have been installed. GEOquery is a Bioconductor package. To download this package, first the BiocManager package is installed and then the GEOquery package is installed through this package. The dataset was loaded with the code GSE115342 and the size of the data was obtained.
+
+```{r, echo = TRUE, message=FALSE}
+library(GEOquery)
+```
+
+
+```{r, echo=FALSE, message=FALSE}
+gse_data <- getGEO("GSE115342", AnnotGPL=TRUE) 
+gse_data  <- gse_data [[1]] 
+dim(gse_data)
+```
+**B- ** There are sample titles in the phenoData information in the dataset. Sample titles were used to determine the index for each category. At this stage, regular expressions and wildcard characters were used. Below are the regular expressions created for each category.
+
+```{r , echo = TRUE}
+titles <- pData(gse_data)$title 
+print(titles)
+Cortex_chow<- grep(".*_cortex_chow_.*_[1-3]$", titles) 
+Cortex_LCKD <- grep(".*_cortex_LCKD_.*_[1-3]$", titles)
+Liver_chow <-grep(".*_liver_chow_.*_[1-3]$", titles)
+Liver_LCKD <- grep(".*_liver_LCKD_.*_[1-3]$", titles)
+```
+As a result of the regular expressions created, information on how many samples were in each category was obtained.
+
+```{r , echo = FALSE}
+print(paste("Category 1: Chow-diet cortex, Number of samples:",length(Cortex_chow)))
+print(paste("Category 2: LCKD cortex, Number of samples:",length(Cortex_LCKD)))
+print(paste("Category 3: Chow-diet liver, Number of samples:",length(Liver_chow)))
+print(paste("Category 4: LCKD liver,  Number of samples:",length(Liver_LCKD)))
+
+```
+
+**C- ** To compare the mRNA levels of Chow diet and LCKD data for cortex and liver tissues, t.test was applied and p values were calculated. The obtained p values are shown using Ggplot2 to show the relationship between the p values of the cortex and liver. t.test is used to statistically compare the values between two groups. In this study, different diet programs were compared in the same tissues. Some of the p values calculated below are shown with the head function.
+
+```{r , echo = FALSE}
+data_exprs<-exprs(gse_data)
+
+cortex_p_values <- NULL 
+for (i in 1:nrow(data_exprs)) {
+  cortex_p_values[i] <- t.test(data_exprs[i, Cortex_chow], data_exprs[i,Cortex_LCKD])$p.value
+}
+print("Cortex p values:")
+head(cortex_p_values)
+liver_p_values <- NULL
+for (i in 1:nrow(data_exprs)) {
+  liver_p_values[i] <- t.test(data_exprs[i, Liver_chow], data_exprs[i, Liver_LCKD])$p.value
+}
+print("Liver p values:")
+head(liver_p_values)
+```
+
+
+The p values were taken as -log10 before turning them into graphs. The reason for taking the negative logarithm is that p values are generally between 0 and 1, and -log10 gives an easier and more understandable result. 
+```{r , echo = TRUE}
+p_values_data <- data.frame(
+  Cortex = -log10(cortex_p_values),
+  Liver = -log10(liver_p_values)
+)
+
+```
+
+```{r , echo = TRUE, message=FALSE}
+library(ggplot2) 
+```
+
+A scatter plot was drawn with the calculated p values. At this stage, the geom_point function was first used, but it was observed that the values overlapped each other a lot, that is, there was overplotting, so this problem was solved by using the geom_jitter function. The plot shows the relationship between the p values obtained for the cortex and liver. 
+
+```{r , echo = FALSE ,fig.cap="**Figure 1** In this figre show that Relation Between Cortex and Liver P Values", fig.align="center"}
+ggplot(p_values_data)+
+  aes(x = Cortex, y = Liver) +
+  geom_jitter(pch = ".", alpha = 0.3, color = "red") + 
+  labs(title = "Relation Between Cortex and Liver P Values",
+       x = "P values of Cortex", y = "P values of Liver") + 
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+```
+The majority of the distribution of p values is concentrated between low values, which indicates that p values are mostly low in both tissues. For p values, 0.05 is generally considered statistically significant. When the plot is examined, p values below 0.05 are more common. There are points with high p values for both tissues, but these points are quite few.
+
+**D- ** Analysis was performed on the 5 genes with the lowest p values in the cortex tissue. featureData is the dataset containing the gene information in the data. It contains information such as ensemble gene identities, gene symbols, and chromosome information. Using this information, detailed analysis was made about 5 genes and the necessary packages were downloaded for these analyses.
+```{r , echo = TRUE, message=FALSE}
+library(biomaRt)
+library(GenomicFeatures)
+library(TxDb.Mmusculus.UCSC.mm9.knownGene)
+
+```
+The biomart package is an R package that enables communication with biological databases. In this study, it was used to access the Ensemble database. The GenomicFeatures package contains genetic information (gene ranges, gene annotations, etc.). In this study, 5 genes were used to achieve the desired genomic features. TxDb.Mmusculus.UCSC.mm9.knownGene Contains Mus musculus genome annotation data. In order to access the desired information of the data used in the study, the general genome information of the species was downloaded.
+
+```{r , echo = TRUE}
+feature_data <- fData(gse_data) 
+sorted_genes <- order(cortex_p_values)
+lowest_pval_genes <-feature_data[sorted_genes[1:5], ] 
+
+gene_symbols <- lowest_pval_genes$GENE_SYMBOL
+ensembl_ids <- lowest_pval_genes$ENSEMBL_ID
+chromosome_inf <- lowest_pval_genes$CHROMOSOMAL_LOCATION
+```
+The information for the 5 genes with the lowest p values on the cortex tissue in the feature data is shown below. Some information deficiencies indicate that that information is not included in the data set.
+```{r , echo = FALSE}
+for (i in 1:5) {
+    cat("\nGene Symbol:", gene_symbols[i],
+      "\nEnsembl ID",ensembl_ids[i],
+       "\nChromosome Information:", chromosome_inf[i])}
+```
+Using the biomart package, the Ensembl database was accessed and the Entrez gene id information was obtained. At this stage, the getBM function was used. This function has parameters; The attributes argument contains information about the output resulting from the information obtained, filters refers to the available information, that is, input, the values argument contains the actual value of the values to be given as input, the march argument contains the data set obtained from the Ensemble database.
+```{r , echo = TRUE}
+ensembl <- useMart("ENSEMBL_MART_ENSEMBL") 
+ensemble_data <- useDataset("mmusculus_gene_ensembl", ensembl) 
+entrez_ids <- getBM(attributes = c("ensembl_transcript_id", "entrezgene_id"), 
+                    filters = "ensembl_transcript_id", 
+                    values = ensembl_ids, 
+                    mart = ensemble_data)
+```
+
+The desired detailed genomic data was obtained with the entrez gene ids obtained on the genome information of Mus musculus. Genomic information was available for only 3 of the 5 genes with the smallest p value. The information is given below. In which chromosome the 3 genes are located, in which range they are located, strand information and gene ids were obtained.
+```{r , echo = TRUE, message=FALSE, warning=FALSE}
+txdb <- TxDb.Mmusculus.UCSC.mm9.knownGene
+indices_gene_ids <- which(as.numeric(genes(txdb)$gene_id) %in% entrez_ids$entrezgene_id) 
+genes_txdb <- genes(txdb)
+for (i in indices_gene_ids ) {
+  print(genes_txdb[i])
+}
+
+```
+**E- ** The expression data was converted to data frames and received the transposon. 
+```{r , echo = FALSE}
+df_exprs_data <- as.data.frame(data_exprs) 
+t_df_exprs_data <- as.data.frame(t(df_exprs_data))
+```
+
+A pattern was created using regular expression. This pattern contains all the sample titles previously obtained from phenodata. In this way, first of all, all the titles were accessed by using this pattern, then only the texture and diet information was left with the gsub function, and then the titles were converted to the desired format with gsub.The first 5 rows with all columns of the created data are shown below.
+
+```{r , echo = TRUE}
+pattern <- ".*_(cortex|liver)_(chow|LCKD)_.*_[1-3]$"
+
+categories <- gsub(pattern, "\\1_\\2",titles) 
+new_titles <- gsub("cortex_chow", "brain_chow", categories)
+Sample_Titles <- gsub("cortex_LCKD", "brain_LCKD", new_titles)
+
+t_df_exprs_data <- cbind(Sample_Titles , t_df_exprs_data) 
+print(head(t_df_exprs_data[, 1:5], n = 12))
+```
+**F- **It was found that the LCKD diet changed the expression of the Gm2a gene, which plays a role in ganglioside degradation, so information about the Gm2a gene was obtained using feature data. The mRNA levels of this gene were reached with the expression dataset and a new data frame was created.
+```{r , echo = FALSE}
+
+gm2a_gene <- feature_data[feature_data$GENE_SYMBOL == "Gm2a", ]
+gm2a_exprs_levels <- t_df_exprs_data[,c(1,gm2a_gene$ID)] 
+colnames(gm2a_exprs_levels)[2] <- "Gm2a_mRNA_levels"
+print(gm2a_exprs_levels)
+```
+
+```{r , echo = FALSE ,fig.cap="**Figure 2** Gm2a gene mRNA levels separate for each category", fig.align="center"}
+
+ggplot(gm2a_exprs_levels) + 
+  aes(x = Sample_Titles , y = Gm2a_mRNA_levels ) +
+  geom_boxplot(alpha = 0)+
+  geom_jitter(alpha = 0.3,color="blue") +
+  labs(title="Gm2a_gene_mRNAs_levels",x ="Sample_categories",y ="mRNA levels") + 
+  theme(plot.title = element_text(hjust = 0.5))
+  
+```
+A boxplot was created for the Gm2a gene, with mRNA levels separate for each category. When this box plot is examined, it is observed that mRNA levels of the Gm2a gene are low for the brain LCKD category. The median of the box plot is at 6, and most of the data is concentrated around 6, which means that there is very little variation between the data. When we look at the brain chow diet, it is seen that the mRNA levels are still low, around 5-6, and the variation is still quite low. When liver tissue is examined, mRNA levels of the LCKD Gm2a gene are seen to be higher. Medians vary between 8-11, the median is around 12, extreme points appear and it is observed that the variation is large. When looking at the liver chow diet, mRNA levels ranged between 8-11. There was variation in this category as well, but not as much as in the LCKD category.
+
+**G- ** For each gene in the data, the average mRNA expression in each sample category was grouped by sample titles using aggregate function and the averages were calculated and the results were recorded in a new data frame. Row names were replaced with sample titles, that is, categories, and the sample titles column in the data frame was removed. The resulting data frame was then transposoned.
+Some of the final version of the data is included below.
+
+```{r , echo = TRUE, warning=FALSE}
+
+average_mRNAs <- aggregate(. ~ Sample_Titles, data = t_df_exprs_data, FUN = mean)
+rownames(average_mRNAs) <- average_mRNAs$Sample_Titles 
+average_mRNAs <- subset(average_mRNAs, select = -Sample_Titles) 
+average_mRNAs_t <- t(average_mRNAs) 
+head(average_mRNAs_t)
+
+```
+**H- ** The averaged mRAN levels were transformed into a data frame. Then, distribution graphs were drawn showing how different tissues changed in the same diet type.
+```{r , echo = FALSE}
+average_mRNAs_t_df <- as.data.frame(average_mRNAs_t)
+```
+
+```{r , echo = FALSE ,fig.cap="**Figure 3** Relationship between liver and brain samples in the LCKD", fig.align="center"}
+ggplot(average_mRNAs_t_df) +
+  aes(x = brain_LCKD, y = liver_LCKD) + 
+  geom_jitter(pch = ".", alpha = 0.3, color = "red") +
+  labs(title = "Brain versus Liver in LCKD",
+       x = "Brain LCKD", y = "Liver LCKD") + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+The chart shows the relationship between liver and brain samples on the LCKD diet. A dense pile of data with low values is seen in most of the graph. This shows that many genes have low mRNA levels in both the brain and liver. There are a few points in the graph with high mRNA levels. These may indicate elevated expression levels of specific genes to the LCKD diet.
+Considering the general distribution, it is not enough to say that there is a significant correlation between the brain and liver. There are a few points that contain a linear correlation, but most points are spread over a wide area.
+```{r , echo = FALSE,fig.cap="**Figure 4** Relationship between liver and brain samples in the chow diet", fig.align="center" }
+
+
+ggplot(average_mRNAs_t_df) +
+  aes(x = brain_chow, y =liver_chow) + 
+  geom_jitter(pch = ".", alpha = 0.3, color = "red") +
+  labs(title = "Brain versus Liver in Chow-diet",
+       x = "Brain Chow-diet", y = "Liver Chow-diet") + 
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+The plot shows the relationship between liver and brain samples in the chow diet. Most of the graph shows a dense mass of data at low values, as in the LCKD diet. Therefore, it can be said that many genes have low mRNA levels in both the brain and liver for this diet. In this graph, compared to the graph on the LCKD diet, the dots in the liver show greater mRNA levels. but the two graphs are similar to each other in terms of correlation relationship. There are a few gene points that are linearly related, but overall the data points are widely dispersed at low levels.
+
+**I- ** The data was edited using the tidyr package. Now there are 2 columns for each gene in the data. One of the columns contains the category and the other contains mRNA levels. While doing this, the dataset was filtered to include only those with mRNA levels higher than 1000. A box plot was then drawn showing the distribution of mRNA levels for each of the four categories.
+
+Required packages installed; The pivot_longer function comes from the tidyr package, the filtering stage comes from the dplyr library.
+```{r , echo = TRUE, message=FALSE}
+library(tidyr)
+library(dplyr)
+
+```
+The new **tidy** data set is below.
+```{r , echo = TRUE}
+new_format <-average_mRNAs_t_df %>% pivot_longer(cols = c("brain_LCKD","liver_LCKD","brain_chow","liver_chow"),
+                                                names_to = "Sample_Category",
+                                                values_to = "mRNA_Levels") %>% filter(mRNA_Levels > 1000) 
+
+head(new_format)
+```
+
+```{r , echo = FALSE , fig.cap="**Figure 5** Box plot that average mRAN levels in each category are shown separately", fig.align="center"}
+ggplot(new_format) + 
+  aes(x = Sample_Category , y = mRNA_Levels ) +
+  geom_boxplot(alpha = 0)+
+  geom_jitter(alpha = 0.3, 
+              color = "blue")  +
+  labs(title = "Distribution of mRNA Levels",
+       x = "Sample categories", y = "mRNA levels") + 
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+```
+In the graph, the average mRAN levels in each category are shown separately as box plots. It can be seen that the points are in the form of a dense pile of data at the lowest levels in each category. It is seen that the data in the liver tissue contain genes that are more spread and have higher mRNA levels than the points in the cortex. It has been observed that the points with the highest mRAN level are in the chow diet in the liver and this supports the previous graphs.
