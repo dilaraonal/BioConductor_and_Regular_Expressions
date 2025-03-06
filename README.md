@@ -1,4 +1,38 @@
-## BioConductor & Regular Expressions
+# BioConductor & Regular Expressions
+## Bioconductor
+Bioconductor is an open-source project that provides R packages specifically designed for bioinformatics and computational biology. It offers powerful tools for analyzing genomics, transcriptomics, proteomics, and metabolomics data.
+**Install Bioconductor Manager**
+
+```r
+install.packages("BiocManager")
+```
+
+**Install Bioconductor Packages that are necessarily**
+
+```r
+BiocManager::install("GEOquery") 
+BiocManager::install("biomaRt") 
+BiocManager::install("GenomicFeatures") 
+BiocManager::install("TxDb.Mmusculus.UCSC.mm9.knownGene") # The genome data of the living species used was downloaded
+```
+## Regular Expressions
+Both tidyr and dplyr are part of the tidyverse package collection in R. They are designed for data manipulation and cleaning, making it easier to work with data frames. Regular expressions (regex) and the tidyr package are both powerful tools for data cleaning and transformation. They are often used together in text manipulation tasks when preparing datasets for analysis.
+
+## Necessarily Library
+```r
+library(tidyr)
+library(dplyr)
+```
+
+| Function          | Description |
+|------------------|------------|
+| `pivot_longer()` | 	Converts wide data to long format |
+| `pivot_wider()` | Converts long data to wide format |
+| `separate()` | Splits one column into multiple columns |
+| `unite()` | 	Combines multiple columns into one |
+
+
+## Applications 
 
 Low carbohydrate ketogenic diet (LCKD) is used to treat epilepsy and obesity. Okuda (2019) collected transcriptomic samples from the livers and brains of regular-fed (chow diet) mice and LCKD-fed mice. The data is available in GEO (Gene Expression Omnibus) with the ID of GSE115342. There are four categories in the dataset, and three replicate samples in each category, making the total number of samples in the dataset 12. The categories are, chow-diet cortex, chow-diet liver, LCKD cortex, and LCKD liver.
 
@@ -22,13 +56,3 @@ Low carbohydrate ketogenic diet (LCKD) is used to treat epilepsy and obesity. Ok
 
 **i)** Now, you want to compare expression levels of all the genes in the four categories using boxplot. For this, you will first “tidy” the data using tidyR package. Rather than having 4 columns for each gene, we want to have two columns: one listing category names, the other one listing the corresponding expression value. Use the tidy version to filter this new dataframe such that only rows having values higher than 1000 remains. Then, plot a boxplot to show the distribution of mRNA levels for each of four categories. Remember to enhance the visual quality of your plot by using jitter plots and using opacity options. Discuss the boxplot in terms of different behaviours in different categories.
 
-## Packages
-Geoquery
-
-BioMarts
-
-GenomicFeatures
-
-ggplot2
-
-tidyR
